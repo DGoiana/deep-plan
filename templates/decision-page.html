@@ -1,0 +1,382 @@
+<!--
+  DEEP PLAN — Decision Page Template (Post-Decision Narrative)
+
+  Generated AFTER the user decides. Shows the chosen option prominently
+  with evidence, rationale, acceptance criteria, and risks.
+
+  Content markers:
+    {{PROJECT_NAME}}      — project/feature name
+    {{DECISION_NUMBER}}   — plain number (e.g. "3")
+    {{DECISION_TOTAL}}    — total decisions (e.g. "8")
+    {{DECISION_TITLE}}    — human-readable title
+    {{CATEGORY}}          — architecture|behavior|data|interface|visual|quality
+    {{CATEGORY_LABEL}}    — display label (e.g. "Architecture")
+    {{PRESENTED_AT}}      — ISO timestamp when presented
+    {{DECIDED_AT}}        — ISO timestamp when decided
+    {{IS_AUTO}}           — "true" or "false"
+    {{EVIDENCE_CONTENT}}  — HTML: what the agent found in the codebase
+    {{CHOSEN_LETTER}}     — e.g. "B"
+    {{CHOSEN_NAME}}       — e.g. "tRPC Typed"
+    {{CHOSEN_DESC}}       — full description of chosen option
+    {{REJECTED_OPTIONS}}  — HTML: chips for rejected options
+    {{RATIONALE}}         — HTML: why this choice was made
+    {{ACCEPTANCE}}        — HTML: how to verify it works
+    {{RISKS}}             — HTML: flagged risks (or "None identified")
+    {{PREV_LINK}}         — HTML: link to previous decision (or empty)
+    {{NEXT_LINK}}         — HTML: link to next decision (or empty)
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Decision {{DECISION_NUMBER}}: {{DECISION_TITLE}} — {{PROJECT_NAME}}</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+      background: #0f172a;
+      color: #e2e8f0;
+      min-height: 100vh;
+      padding: 2rem;
+      line-height: 1.6;
+    }
+
+    .container {
+      max-width: 720px;
+      margin: 0 auto;
+    }
+
+    /* Back link */
+    .back-link {
+      display: inline-block;
+      font-size: 0.8rem;
+      color: #818cf8;
+      text-decoration: none;
+      margin-bottom: 1.5rem;
+    }
+    .back-link:hover { text-decoration: underline; }
+
+    /* Header */
+    header {
+      margin-bottom: 2rem;
+      padding-bottom: 1.5rem;
+      border-bottom: 1px solid #1e293b;
+    }
+
+    .decision-meta-top {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      margin-bottom: 0.25rem;
+      flex-wrap: wrap;
+    }
+
+    .decision-number {
+      font-size: 0.65rem;
+      font-weight: 800;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: #64748b;
+    }
+
+    .category-tag {
+      font-size: 0.6rem;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      padding: 2px 8px;
+      border-radius: 4px;
+    }
+
+    .category-tag.architecture { background: #312e81; color: #a5b4fc; }
+    .category-tag.behavior { background: #164e63; color: #67e8f9; }
+    .category-tag.data { background: #14532d; color: #86efac; }
+    .category-tag.interface { background: #7f1d1d; color: #fca5a5; }
+    .category-tag.visual { background: #4a1d96; color: #d8b4fe; }
+    .category-tag.quality { background: #78350f; color: #fcd34d; }
+
+    .auto-tag {
+      font-size: 0.6rem;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      padding: 2px 8px;
+      border-radius: 4px;
+      background: #2e1065;
+      color: #c4b5fd;
+    }
+
+    .timestamp {
+      font-size: 0.7rem;
+      color: #475569;
+      font-family: 'SF Mono', 'Fira Code', monospace;
+    }
+
+    header h1 {
+      font-size: 1.5rem;
+      font-weight: 700;
+      color: #f8fafc;
+      letter-spacing: -0.02em;
+    }
+
+    /* Content blocks */
+    .block {
+      background: #1e293b;
+      border-radius: 10px;
+      padding: 1.25rem;
+      margin-bottom: 1rem;
+      border: 1px solid #334155;
+    }
+
+    .block-label {
+      font-size: 0.6rem;
+      font-weight: 800;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      margin-bottom: 0.5rem;
+    }
+
+    .block-content {
+      font-size: 0.875rem;
+      color: #cbd5e1;
+      line-height: 1.7;
+    }
+
+    .block-content code {
+      background: #334155;
+      padding: 1px 5px;
+      border-radius: 3px;
+      font-family: 'SF Mono', 'Fira Code', monospace;
+      font-size: 0.8rem;
+      color: #e2e8f0;
+    }
+
+    /* Evidence — indigo */
+    .block.evidence { border-left: 3px solid #6366f1; }
+    .block.evidence .block-label { color: #818cf8; }
+
+    /* Chosen — green */
+    .block.chosen {
+      border-left: 3px solid #22c55e;
+      background: #0f2a1b;
+      border-color: #22c55e;
+    }
+    .block.chosen .block-label { color: #4ade80; }
+
+    .chosen-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.5rem;
+      margin-bottom: 0.5rem;
+    }
+
+    .chosen-title {
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: #4ade80;
+    }
+
+    .chosen-timestamp {
+      font-size: 0.7rem;
+      color: #64748b;
+      font-family: 'SF Mono', 'Fira Code', monospace;
+    }
+
+    /* Rationale — amber */
+    .block.rationale { border-left: 3px solid #f59e0b; }
+    .block.rationale .block-label { color: #fbbf24; }
+
+    /* Acceptance — cyan */
+    .block.acceptance { border-left: 3px solid #06b6d4; }
+    .block.acceptance .block-label { color: #22d3ee; }
+
+    /* Risks — red */
+    .block.risks { border-left: 3px solid #ef4444; }
+    .block.risks .block-label { color: #f87171; }
+
+    /* Rejected options */
+    .rejected-section { margin-bottom: 1rem; }
+
+    .rejected-label {
+      font-size: 0.7rem;
+      font-weight: 700;
+      color: #64748b;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      margin-bottom: 0.5rem;
+    }
+
+    .rejected-grid {
+      display: flex;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+    }
+
+    .rejected-chip {
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 6px;
+      padding: 0.4rem 0.75rem;
+      font-size: 0.75rem;
+      color: #64748b;
+      flex: 1;
+      min-width: 120px;
+    }
+
+    .rejected-chip .chip-letter {
+      font-weight: 800;
+      color: #475569;
+      margin-right: 0.25rem;
+    }
+
+    .rejected-chip .chip-name {
+      font-weight: 600;
+      color: #94a3b8;
+    }
+
+    /* Navigation */
+    .nav-links {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 1.5rem;
+      font-size: 0.8rem;
+    }
+
+    .nav-links a {
+      color: #818cf8;
+      text-decoration: none;
+    }
+    .nav-links a:hover { text-decoration: underline; }
+
+    /* Footer */
+    .page-footer {
+      margin-top: 2rem;
+      padding-top: 1rem;
+      border-top: 1px solid #1e293b;
+      text-align: center;
+      font-size: 0.75rem;
+      color: #475569;
+    }
+
+    .page-footer code {
+      background: #1e293b;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-family: 'SF Mono', 'Fira Code', monospace;
+      color: #94a3b8;
+    }
+
+    /* Prompt page link */
+    .prompt-link {
+      display: inline-block;
+      margin-top: 0.5rem;
+      font-size: 0.75rem;
+      color: #64748b;
+    }
+
+    .prompt-link a {
+      color: #818cf8;
+      text-decoration: none;
+    }
+    .prompt-link a:hover { text-decoration: underline; }
+
+    @media (max-width: 640px) {
+      body { padding: 1rem; }
+      .rejected-grid { flex-direction: column; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <a href="index.html" class="back-link">&larr; Dashboard</a>
+
+    <header>
+      <div class="decision-meta-top">
+        <span class="decision-number">Decision {{DECISION_NUMBER}} of {{DECISION_TOTAL}}</span>
+        <span class="category-tag {{CATEGORY}}">{{CATEGORY_LABEL}}</span>
+        <!-- Include auto-tag ONLY for auto-decided decisions:
+        <span class="auto-tag">Auto-decided</span>
+        -->
+        <span class="timestamp">{{DECIDED_AT}}</span>
+      </div>
+      <h1>{{DECISION_TITLE}}</h1>
+      <p class="prompt-link">
+        <a href="decision-{{DECISION_NUMBER}}-prompt.html">View original comparison &rarr;</a>
+      </p>
+    </header>
+
+    <!-- EVIDENCE -->
+    <div class="block evidence">
+      <div class="block-label">What the Code Says</div>
+      <div class="block-content">
+        {{EVIDENCE_CONTENT}}
+      </div>
+    </div>
+
+    <!-- CHOSEN OPTION -->
+    <div class="block chosen">
+      <div class="block-label">Chosen</div>
+      <div class="chosen-header">
+        <span class="chosen-title">Option {{CHOSEN_LETTER}}: {{CHOSEN_NAME}}</span>
+        <span class="chosen-timestamp">{{DECIDED_AT}}</span>
+      </div>
+      <div class="block-content">
+        {{CHOSEN_DESC}}
+      </div>
+    </div>
+
+    <!-- REJECTED OPTIONS -->
+    <div class="rejected-section">
+      <div class="rejected-label">Also Considered</div>
+      <div class="rejected-grid">
+        {{REJECTED_OPTIONS}}
+        <!-- Example:
+        <div class="rejected-chip">
+          <span class="chip-letter">A</span>
+          <span class="chip-name">REST Classic</span>
+        </div>
+        -->
+      </div>
+    </div>
+
+    <!-- RATIONALE -->
+    <div class="block rationale">
+      <div class="block-label">Why This Choice</div>
+      <div class="block-content">
+        {{RATIONALE}}
+      </div>
+    </div>
+
+    <!-- ACCEPTANCE CRITERIA -->
+    <div class="block acceptance">
+      <div class="block-label">Acceptance Criteria</div>
+      <div class="block-content">
+        {{ACCEPTANCE}}
+      </div>
+    </div>
+
+    <!-- RISKS -->
+    <div class="block risks">
+      <div class="block-label">Risks</div>
+      <div class="block-content">
+        {{RISKS}}
+      </div>
+    </div>
+
+    <!-- NAVIGATION -->
+    <div class="nav-links">
+      {{PREV_LINK}}
+      <!-- e.g. <a href="decision-2.html">&larr; Decision 2</a> -->
+      {{NEXT_LINK}}
+      <!-- e.g. <a href="decision-4.html">Decision 4 &rarr;</a> -->
+    </div>
+
+    <div class="page-footer">
+      <p>To change this decision: <code>for decision {{DECISION_NUMBER}} I want Option [X] instead</code></p>
+    </div>
+  </div>
+</body>
+</html>

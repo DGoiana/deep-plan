@@ -1,0 +1,850 @@
+<!--
+  DEEP PLAN — Decision Prompt Template (Pre-Decision Comparison)
+
+  Shows all options side by side with rich visual previews, pros/cons,
+  and a comparison table so the user can make an informed choice.
+
+  Content markers:
+    {{PROJECT_NAME}}          — project/feature name
+    {{DECISION_NUMBER}}       — plain number (e.g. "3")
+    {{DECISION_TOTAL}}        — total decisions (e.g. "8")
+    {{DECISION_TITLE}}        — human-readable title
+    {{CATEGORY}}              — architecture|behavior|data|interface|visual|quality
+    {{CATEGORY_LABEL}}        — display label (e.g. "Architecture")
+    {{DECISION_DESCRIPTION}}  — 3-5 sentences explaining the decision in plain English
+    {{EVIDENCE_CONTENT}}      — HTML: what the agent found in the codebase
+    {{OPTION_CARDS}}          — HTML: repeated card blocks (see SKILL.md for structure)
+    {{COMPARISON_TABLE}}      — HTML: full <table> element
+    {{RECOMMENDED_LETTER}}    — letter of recommended option, e.g. "B"
+    {{RECOMMENDATION_REASON}} — 1-2 sentences explaining why
+
+  Option card markup (repeat per option, see SKILL.md for full structure):
+    <article class="option-card option-a [chosen] [not-chosen]">
+      <div class="card-header">...</div>
+      <div class="visual-preview">...</div>
+      <div class="option-summary">...</div>
+      <div class="verdict">...</div>
+      <div class="card-footer">...</div>
+    </article>
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Decision {{DECISION_NUMBER}}: {{DECISION_TITLE}} — {{PROJECT_NAME}}</title>
+  <style>
+    /* === BASE === */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+      background: #0f172a;
+      color: #e2e8f0;
+      min-height: 100vh;
+      padding: 2rem;
+      line-height: 1.6;
+    }
+
+    /* === BACK LINK === */
+    .back-link {
+      display: inline-block;
+      margin-bottom: 1.5rem;
+      font-size: 0.85rem;
+      color: #818cf8;
+      text-decoration: none;
+      max-width: 1200px;
+    }
+    .back-link:hover { text-decoration: underline; }
+
+    /* === HEADER === */
+    header {
+      text-align: center;
+      margin-bottom: 2.5rem;
+      padding-bottom: 1.5rem;
+      border-bottom: 1px solid #1e293b;
+      max-width: 1200px;
+      margin-left: auto;
+      margin-right: auto;
+    }
+
+    .decision-number {
+      font-size: 0.75rem;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: #64748b;
+    }
+
+    header h1 {
+      font-size: 1.6rem;
+      font-weight: 700;
+      color: #f8fafc;
+      letter-spacing: -0.02em;
+      margin-top: 0.25rem;
+    }
+
+    .category-badge {
+      display: inline-block;
+      padding: 4px 12px;
+      border-radius: 999px;
+      font-size: 0.7rem;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      margin-top: 0.5rem;
+    }
+
+    .category-badge.architecture { background: #312e81; color: #a5b4fc; }
+    .category-badge.behavior { background: #164e63; color: #67e8f9; }
+    .category-badge.data { background: #14532d; color: #86efac; }
+    .category-badge.interface { background: #7f1d1d; color: #fca5a5; }
+    .category-badge.visual { background: #4a1d96; color: #d8b4fe; }
+    .category-badge.quality { background: #78350f; color: #fcd34d; }
+
+    .decision-description {
+      font-size: 1rem;
+      color: #94a3b8;
+      margin-top: 0.75rem;
+      max-width: 700px;
+      margin-left: auto;
+      margin-right: auto;
+      line-height: 1.7;
+    }
+
+    .instruction {
+      margin-top: 1rem;
+      font-size: 0.85rem;
+      background: #1e1b4b;
+      color: #a5b4fc;
+      padding: 0.6rem 1.25rem;
+      border-radius: 8px;
+      display: inline-block;
+      border: 1px solid #312e81;
+    }
+
+    .instruction strong { color: #c7d2fe; }
+
+    /* === EVIDENCE BLOCK === */
+    .evidence-block {
+      max-width: 1200px;
+      margin: 0 auto 2rem;
+      background: #1e293b;
+      border-radius: 12px;
+      padding: 1.25rem;
+      border: 1px solid #334155;
+      border-left: 3px solid #6366f1;
+    }
+
+    .evidence-label {
+      font-size: 0.6rem;
+      font-weight: 800;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: #818cf8;
+      margin-bottom: 0.5rem;
+    }
+
+    .evidence-content {
+      font-size: 0.875rem;
+      color: #cbd5e1;
+      line-height: 1.7;
+    }
+
+    .evidence-content code {
+      background: #334155;
+      padding: 1px 5px;
+      border-radius: 3px;
+      font-family: 'SF Mono', 'Fira Code', monospace;
+      font-size: 0.8rem;
+      color: #e2e8f0;
+    }
+
+    /* === OPTIONS GRID === */
+    .options-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.5rem;
+      max-width: 1200px;
+      margin: 0 auto 2rem;
+    }
+
+    /* === OPTION CARD === */
+    .option-card {
+      background: #1e293b;
+      border-radius: 14px;
+      overflow: hidden;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+      border: 2px solid #334155;
+      transition: all 0.2s ease;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+    }
+
+    .option-card:hover {
+      border-color: #6366f1;
+      box-shadow: 0 4px 20px rgba(99,102,241,0.15);
+    }
+
+    .card-header {
+      padding: 1rem 1.25rem 0.75rem;
+      border-bottom: 1px solid #283548;
+      display: flex;
+      flex-direction: column;
+      gap: 0.2rem;
+    }
+
+    .card-header-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.5rem;
+    }
+
+    .option-label {
+      font-size: 0.65rem;
+      font-weight: 800;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+    }
+
+    /* Option label colors — dark theme */
+    .option-card.option-a .option-label { color: #c4b5fd; }
+    .option-card.option-b .option-label { color: #67e8f9; }
+    .option-card.option-c .option-label { color: #86efac; }
+    .option-card.option-d .option-label { color: #fca5a5; }
+
+    .option-title {
+      font-size: 1.05rem;
+      font-weight: 600;
+      color: #f8fafc;
+    }
+
+    /* === BADGES === */
+    .card-badges {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 4px;
+      flex-shrink: 0;
+    }
+
+    .recommended-badge {
+      background: #f59e0b;
+      color: #451a03;
+      padding: 3px 10px;
+      border-radius: 999px;
+      font-size: 0.65rem;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      white-space: nowrap;
+    }
+
+    .chosen-badge {
+      background: #22c55e;
+      color: #052e16;
+      padding: 3px 10px;
+      border-radius: 999px;
+      font-size: 0.65rem;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      white-space: nowrap;
+      display: none;
+    }
+
+    .option-card.chosen .chosen-badge { display: inline-block; }
+
+    /* === CHOSEN / NOT-CHOSEN STATES === */
+    .option-card.chosen {
+      border: 3px solid #22c55e;
+      box-shadow: 0 4px 20px rgba(34,197,94,0.15);
+    }
+
+    .option-card.chosen:hover { border-color: #22c55e; }
+
+    .option-card.not-chosen {
+      opacity: 0.4;
+      filter: grayscale(30%);
+    }
+
+    .option-card.not-chosen:hover {
+      opacity: 0.7;
+      filter: none;
+    }
+
+    /* === VISUAL PREVIEW === */
+    .visual-preview {
+      padding: 1.5rem;
+      background: #0f172a;
+      min-height: 180px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex: 1;
+    }
+
+    /* === OPTION SUMMARY === */
+    .option-summary {
+      padding: 1rem 1.25rem;
+      font-size: 0.875rem;
+      color: #cbd5e1;
+      line-height: 1.65;
+      border-top: 1px solid #283548;
+    }
+
+    /* === PROS / CONS === */
+    .verdict {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      border-top: 1px solid #283548;
+    }
+
+    .pros, .cons { padding: 1rem 1.25rem; }
+    .pros { border-right: 1px solid #283548; }
+
+    .pros h3, .cons h3 {
+      font-size: 0.65rem;
+      font-weight: 800;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      margin-bottom: 0.5rem;
+    }
+
+    .pros h3 { color: #4ade80; }
+    .cons h3 { color: #fb7185; }
+
+    .verdict ul { list-style: none; padding: 0; }
+
+    .verdict li {
+      font-size: 0.8rem;
+      color: #94a3b8;
+      line-height: 1.5;
+      padding: 0.15rem 0;
+      padding-left: 1rem;
+      position: relative;
+    }
+
+    .pros li::before { content: "\2713 "; color: #4ade80; font-weight: 700; position: absolute; left: 0; }
+    .cons li::before { content: "! "; color: #fb7185; font-weight: 700; position: absolute; left: 0; }
+
+    /* === CARD FOOTER === */
+    .card-footer {
+      padding: 0.75rem 1.25rem;
+      background: #162032;
+      border-top: 1px solid #283548;
+    }
+
+    .choose-btn {
+      width: 100%;
+      padding: 0.65rem 1rem;
+      border: 2px solid #334155;
+      border-radius: 8px;
+      background: #0f172a;
+      color: #94a3b8;
+      font-size: 0.8rem;
+      font-weight: 600;
+      font-family: inherit;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+    }
+
+    .choose-btn:hover {
+      border-color: #6366f1;
+      color: #c7d2fe;
+      background: #1e1b4b;
+    }
+
+    .choose-btn:active {
+      transform: scale(0.98);
+    }
+
+    .choose-btn.copied {
+      border-color: #22c55e;
+      color: #4ade80;
+      background: #052e16;
+    }
+
+    .choose-btn .btn-icon { font-size: 1rem; }
+
+    /* === TOAST === */
+    .copy-toast {
+      position: fixed;
+      bottom: 2rem;
+      left: 50%;
+      transform: translateX(-50%) translateY(100%);
+      background: #22c55e;
+      color: #052e16;
+      padding: 0.75rem 1.5rem;
+      border-radius: 10px;
+      font-size: 0.85rem;
+      font-weight: 700;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+      opacity: 0;
+      transition: all 0.3s ease;
+      z-index: 1000;
+      pointer-events: none;
+    }
+
+    .copy-toast.show {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+
+    /* === RECOMMENDATION CALLOUT === */
+    .rec-callout {
+      max-width: 1200px;
+      margin: 0 auto 2rem;
+      background: #132a1d;
+      border: 1px solid #22c55e;
+      border-radius: 12px;
+      padding: 1rem 1.25rem;
+    }
+
+    .rec-callout-label {
+      font-size: 0.6rem;
+      font-weight: 800;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: #4ade80;
+      margin-bottom: 0.25rem;
+    }
+
+    .rec-callout-content {
+      font-size: 0.875rem;
+      color: #bbf7d0;
+      line-height: 1.6;
+    }
+
+    /* === COMPARISON TABLE === */
+    .comparison-section {
+      max-width: 1200px;
+      margin: 0 auto 2rem;
+    }
+
+    .comparison-section h2 {
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: #f8fafc;
+      margin-bottom: 1rem;
+    }
+
+    .comparison-table-wrapper {
+      overflow-x: auto;
+      border-radius: 12px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+    }
+
+    .comparison-table {
+      width: 100%;
+      border-collapse: collapse;
+      background: #1e293b;
+      font-size: 0.82rem;
+    }
+
+    .comparison-table th {
+      padding: 0.85rem 1rem;
+      text-align: left;
+      font-weight: 700;
+      font-size: 0.7rem;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      border-bottom: 2px solid #334155;
+      white-space: nowrap;
+      color: #94a3b8;
+      position: sticky;
+      top: 0;
+      background: #1e293b;
+    }
+
+    .comparison-table th:first-child {
+      position: sticky;
+      left: 0;
+      z-index: 2;
+      background: #162032;
+      color: #64748b;
+    }
+
+    .comparison-table th.col-a { color: #c4b5fd; }
+    .comparison-table th.col-b { color: #67e8f9; }
+    .comparison-table th.col-c { color: #86efac; }
+    .comparison-table th.col-d { color: #fca5a5; }
+
+    .comparison-table td {
+      padding: 0.75rem 1rem;
+      border-bottom: 1px solid #283548;
+      color: #cbd5e1;
+    }
+
+    .comparison-table td:first-child {
+      font-weight: 600;
+      color: #94a3b8;
+      position: sticky;
+      left: 0;
+      background: #162032;
+    }
+
+    .comparison-table tr:nth-child(even) td { background: #1a2536; }
+    .comparison-table tr:nth-child(even) td:first-child { background: #131d2c; }
+
+    .comparison-table .col-recommended { background: #1a2a1d !important; }
+    .comparison-table .col-chosen { background: #132a1d !important; }
+
+    .comparison-table tr:last-child td { border-bottom: none; }
+
+    /* === PAGE FOOTER === */
+    .page-footer {
+      max-width: 1200px;
+      margin: 0 auto;
+      text-align: center;
+      padding: 1.5rem;
+      background: #1e293b;
+      border-radius: 12px;
+      border: 1px solid #334155;
+    }
+
+    .page-footer p {
+      font-size: 0.85rem;
+      color: #64748b;
+      margin: 0.3rem 0;
+    }
+
+    .page-footer strong { color: #94a3b8; }
+
+    /* === FLOW DIAGRAM (interaction decisions) === */
+    .flow-container {
+      display: flex;
+      flex-direction: column;
+      align-items: stretch;
+      gap: 0;
+      padding: 0.5rem;
+      width: 100%;
+      max-width: 280px;
+    }
+
+    .flow-step {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background: #1e293b;
+      border: 2px solid #334155;
+      border-radius: 10px;
+      padding: 8px 12px;
+      font-size: 0.7rem;
+      font-weight: 600;
+      color: #cbd5e1;
+      text-align: left;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.2);
+    }
+
+    .flow-step.highlight {
+      border-color: #6366f1;
+      background: #1e1b4b;
+      color: #c7d2fe;
+    }
+
+    .flow-step.error {
+      border-color: #ef4444;
+      background: #450a0a;
+      color: #fca5a5;
+    }
+
+    .flow-step-number {
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      background: #334155;
+      color: #94a3b8;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.6rem;
+      font-weight: 700;
+      flex-shrink: 0;
+    }
+
+    .flow-step.highlight .flow-step-number { background: #6366f1; color: white; }
+    .flow-step.error .flow-step-number { background: #ef4444; color: white; }
+
+    .flow-step-label { flex: 1; }
+
+    .flow-down-arrow {
+      font-size: 1rem;
+      color: #475569;
+      padding: 2px 0;
+      text-align: center;
+    }
+
+    .flow-branch-label {
+      font-size: 0.6rem;
+      font-weight: 700;
+      color: #64748b;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      text-align: center;
+      padding: 6px 0 2px;
+      border-top: 1px dashed #334155;
+      margin-top: 4px;
+    }
+
+    /* === ARCHITECTURE DIAGRAM (technical decisions) === */
+    .arch-diagram {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+      padding: 0.5rem;
+      width: 100%;
+    }
+
+    .arch-layer {
+      display: flex;
+      gap: 8px;
+      justify-content: center;
+      flex-wrap: wrap;
+      width: 100%;
+    }
+
+    .arch-box {
+      background: #1e293b;
+      border: 2px solid #334155;
+      border-radius: 8px;
+      padding: 8px 14px;
+      font-size: 0.7rem;
+      font-weight: 600;
+      color: #cbd5e1;
+      text-align: center;
+      min-width: 70px;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.2);
+    }
+
+    .arch-box.frontend { border-color: #c4b5fd; color: #c4b5fd; }
+    .arch-box.backend { border-color: #67e8f9; color: #67e8f9; }
+    .arch-box.database { border-color: #86efac; color: #86efac; }
+    .arch-box.service { border-color: #fca5a5; color: #fca5a5; }
+
+    .arch-arrow {
+      font-size: 1rem;
+      color: #475569;
+      text-align: center;
+    }
+
+    /* === SITEMAP (IA/visual decisions) === */
+    .sitemap {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+      padding: 0.5rem;
+    }
+
+    .sitemap-level {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+
+    .sitemap-node {
+      background: #1e293b;
+      border: 2px solid #334155;
+      border-radius: 8px;
+      padding: 6px 12px;
+      font-size: 0.7rem;
+      font-weight: 600;
+      color: #cbd5e1;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.2);
+    }
+
+    .sitemap-node.primary {
+      background: #6366f1;
+      color: white;
+      border-color: #6366f1;
+    }
+
+    .sitemap-connector {
+      width: 2px;
+      height: 12px;
+      background: #475569;
+      margin: 0 auto;
+    }
+
+    /* === EXTENDED OPTION COLORS (for "more options") === */
+    .option-card.option-e .option-label { color: #fdba74; }
+    .option-card.option-f .option-label { color: #f9a8d4; }
+    .option-card.option-g .option-label { color: #5eead4; }
+    .option-card.option-h .option-label { color: #a5b4fc; }
+    .option-card.option-i .option-label { color: #fde68a; }
+    .option-card.option-j .option-label { color: #d8b4fe; }
+    .option-card.option-k .option-label { color: #bef264; }
+    .option-card.option-l .option-label { color: #7dd3fc; }
+
+    .comparison-table th.col-e { color: #fdba74; }
+    .comparison-table th.col-f { color: #f9a8d4; }
+    .comparison-table th.col-g { color: #5eead4; }
+    .comparison-table th.col-h { color: #a5b4fc; }
+    .comparison-table th.col-i { color: #fde68a; }
+    .comparison-table th.col-j { color: #d8b4fe; }
+    .comparison-table th.col-k { color: #bef264; }
+    .comparison-table th.col-l { color: #7dd3fc; }
+
+    /* === RESPONSIVE === */
+    @media (max-width: 768px) {
+      .options-grid { grid-template-columns: 1fr; }
+      body { padding: 1rem; }
+    }
+  </style>
+</head>
+<body>
+  <a href="index.html" class="back-link">&larr; Dashboard</a>
+
+  <header>
+    <span class="decision-number">Decision {{DECISION_NUMBER}} of {{DECISION_TOTAL}}</span>
+    <h1>{{DECISION_TITLE}}</h1>
+    <span class="category-badge {{CATEGORY}}">{{CATEGORY_LABEL}}</span>
+    <p class="decision-description">
+      {{DECISION_DESCRIPTION}}
+    </p>
+    <p class="instruction">
+      Click a button below to copy your choice, then paste into Claude. Or type: <strong>"Option A but [change]"</strong> &middot; <strong>"more options"</strong>
+    </p>
+  </header>
+
+  <!-- EVIDENCE: What the agent found in the codebase -->
+  <div class="evidence-block">
+    <div class="evidence-label">What the Code Says</div>
+    <div class="evidence-content">
+      {{EVIDENCE_CONTENT}}
+    </div>
+  </div>
+
+  <!-- OPTION CARDS -->
+  <main class="options-grid">
+    {{OPTION_CARDS}}
+    <!-- Each card follows this structure:
+    <article class="option-card option-a">
+      <div class="card-header">
+        <div class="card-header-top">
+          <span class="option-label">Option A</span>
+          <div class="card-badges">
+            <span class="recommended-badge">Recommended</span>
+            <span class="chosen-badge">Chosen</span>
+          </div>
+        </div>
+        <h2 class="option-title">[Name]</h2>
+      </div>
+      <div class="visual-preview">[context-dependent visual]</div>
+      <div class="option-summary">[plain English summary]</div>
+      <div class="verdict">
+        <div class="pros">
+          <h3>Works well when</h3>
+          <ul><li>...</li></ul>
+        </div>
+        <div class="cons">
+          <h3>Watch out for</h3>
+          <ul><li>...</li></ul>
+        </div>
+      </div>
+      <div class="card-footer">
+        <button class="choose-btn" onclick="copyChoice('A', this)">
+          <span class="btn-icon">&#x2398;</span> Choose Option A
+        </button>
+      </div>
+    </article>
+    -->
+  </main>
+
+  <!-- RECOMMENDATION -->
+  <div class="rec-callout">
+    <div class="rec-callout-label">Recommendation &mdash; Option {{RECOMMENDED_LETTER}}</div>
+    <div class="rec-callout-content">
+      {{RECOMMENDATION_REASON}}
+    </div>
+  </div>
+
+  <!-- COMPARISON TABLE -->
+  <section class="comparison-section">
+    <h2>How They Compare</h2>
+    <div class="comparison-table-wrapper">
+      {{COMPARISON_TABLE}}
+      <!-- Structure:
+      <table class="comparison-table">
+        <thead>
+          <tr>
+            <th></th>
+            <th class="col-a [col-recommended]">Option A: [Name]</th>
+            ...
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>[Dimension]</td>
+            <td class="[col-recommended]">[Value]</td>
+            ...
+          </tr>
+        </tbody>
+      </table>
+      -->
+    </div>
+  </section>
+
+  <!-- PAGE FOOTER -->
+  <div class="page-footer">
+    <p>Click a button to copy your choice, then paste into Claude</p>
+    <p>Or type: <strong>"Option C but [your change]"</strong>, <strong>"more options"</strong>, <strong>"for decision 1 I want Option B instead"</strong></p>
+  </div>
+
+  <!-- TOAST -->
+  <div class="copy-toast" id="toast"></div>
+
+  <script>
+    function copyChoice(letter, btn) {
+      const text = 'Option ' + letter;
+      navigator.clipboard.writeText(text).then(function() {
+        // Visual feedback on button
+        btn.classList.add('copied');
+        btn.innerHTML = '<span class="btn-icon">&#x2713;</span> Copied \u2014 paste into Claude';
+
+        // Toast
+        var toast = document.getElementById('toast');
+        toast.textContent = '\u201cOption ' + letter + '\u201d copied \u2014 paste into Claude';
+        toast.classList.add('show');
+        setTimeout(function() { toast.classList.remove('show'); }, 2500);
+
+        // Reset button after delay
+        setTimeout(function() {
+          btn.classList.remove('copied');
+          btn.innerHTML = '<span class="btn-icon">&#x2398;</span> Choose Option ' + letter;
+        }, 3000);
+      }).catch(function() {
+        // Fallback for file:// URLs where clipboard API may fail
+        var ta = document.createElement('textarea');
+        ta.value = text;
+        ta.style.position = 'fixed';
+        ta.style.opacity = '0';
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+
+        btn.classList.add('copied');
+        btn.innerHTML = '<span class="btn-icon">&#x2713;</span> Copied \u2014 paste into Claude';
+        var toast = document.getElementById('toast');
+        toast.textContent = '\u201cOption ' + letter + '\u201d copied \u2014 paste into Claude';
+        toast.classList.add('show');
+        setTimeout(function() { toast.classList.remove('show'); }, 2500);
+        setTimeout(function() {
+          btn.classList.remove('copied');
+          btn.innerHTML = '<span class="btn-icon">&#x2398;</span> Choose Option ' + letter;
+        }, 3000);
+      });
+    }
+  </script>
+</body>
+</html>
